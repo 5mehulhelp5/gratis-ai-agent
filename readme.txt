@@ -4,7 +4,7 @@ Tags: ai, chatbot, assistant, automation, tools
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 1.10.0
+Stable tag: 1.11.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -173,6 +173,14 @@ Yes, the plugin works on both single-site and multisite WordPress installations.
 8. Settings page with 12 configuration tabs
 
 == Changelog ==
+
+= 1.11.0 - Released on 2026-05-09 =
+* New: Generic chat-banner and chat-error-message extension points for third-party UI integrations
+* New: AgentEventLog for network-wide review of agent failures
+* Fix: Break /chat/tool-result 409 loop on WP_Error and stale paused_state
+* Fix: Resolve AI provider dynamically instead of using cached references
+* Fix: Correct stale CSS prefix in disabled-card E2E assertions
+* Docs: Add canonical naming rules to prevent rogue renames
 
 = 1.10.0 - Released on 2026-05-05 =
 * New: Tavily internet search — add Tavily as a search provider for richer internet search results alongside Brave Search
