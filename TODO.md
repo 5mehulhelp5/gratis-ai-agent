@@ -351,7 +351,7 @@ Goal: clean, minimal design that matches wp-admin conventions. Replace custom da
   - EDIT: includes/Abilities/ImageSources/ImageSourceFactory.php — in import_image(), on download failure iterate to next free source before AI generate fallback
   - EDIT: includes/Abilities/ImageAbilities/StockImageAbility.php — surface source tried + fallback info in error response
   - Verify: `composer phpstan && composer phpcs`
-- [ ] t237 Add page_template param to create-post and update-post (Phase 2) #enhancement #auto-dispatch ~1h For #t233 logged:2026-04-26
+- [x] t237 Add page_template param to create-post and update-post (Phase 2) #enhancement #auto-dispatch ~1h For #t233 logged:2026-04-26 pr:#1344 completed:2026-05-13
   - EDIT: includes/Abilities/PostAbilities.php — add page_template to input_schema + post_data array in both handle_create_post and handle_update_post
   - Verify: `composer phpstan && composer phpcs`
 - [x] t238 Add set-featured-image standalone ability (Phase 3) #enhancement #auto-dispatch ~1h For #t233 logged:2026-04-26 pr:#1231 completed:2026-04-27
