@@ -209,6 +209,36 @@ Yes, the plugin works on both single-site and multisite WordPress installations.
 == Changelog ==
 
 = 1.12.0 - Released on 2026-05-15 =
+* New: Scaffold and activate block themes directly from the chat interface — agents can generate a complete block theme and switch it live
+* New: Theme Builder onboarding flow — a guided setup wizard builds a custom block theme through the Setup Assistant agent
+* New: Site Specification skill — captures site goals, audience, and brand brief in a structured site_brief memory category for consistent agent context across sessions
+* New: Design System Aesthetics skill — guides agents through typography, colour, spacing, and motion token decisions for a cohesive visual identity
+* New: Google Gemini prompt caching via the cachedContents API for explicit cache lifecycle management; prompt-cache telemetry extended to Azure OpenAI, OpenRouter, and Vertex Anthropic
+* New: Ability visibility controls — each ability now carries a visibility level governing which surfaces (REST, MCP, WooCommerce) expose it, with a partner allow-list for fine-grained access
+* New: Admin notice alerts administrators when unrecognised third-party abilities are installed so they can review and classify them
+* Improved: Third-party ability mode now defaults to auto, enabling native WP Abilities API integration on WordPress 7.0+ without manual configuration
+* Improved: Site Builder mode removed — first-run onboarding is consolidated into the Setup Assistant agent for a simpler experience
+* Improved: /providers endpoint always returns a fresh list — no more stale results when new provider plugins are activated or deactivated
+* Improved: Per-model output-token limits are now aligned with provider documentation for accurate cost and budget management
+* Improved: WooCommerce ability auto-enable is now aligned with the native Abilities API, reducing custom compatibility code
+* Fix: Agent loop unblocked for complex multi-tool conversations — four loop-termination bugs fixed alongside per-model max_tokens and stacked-context corrections
+* Fix: max_tokens and temperature values now reach the AI provider correctly instead of being silently dropped
+* Fix: max_iterations from the plugin Settings page is now respected; the REST API no longer overrides it with a default of 10
+* Fix: WP-CLI `wp sd-ai-agent prompt "text"` command now works correctly
+* Fix: OpenAI-compatible connector now receives provider_id when listing models, fixing discovery for custom-endpoint providers
+* Fix: Transient provider failures are retried automatically; truncated tool calls are handled gracefully
+* Fix: create-post ability now returns real permalinks from the WordPress response in the agent reply
+* Fix: Admin asset URLs resolve correctly when the plugin directory is a symlink
+* Fix: Client ability callbacks are registered locally even on sites where the native WP 7.0 Abilities API is absent
+* Fix: Empty JSON-Schema objects are preserved through the prompt-cache decoder instead of being stripped
+* Fix: cache_creation_tokens columns added to the provider_trace table via dbDelta migration
+* Fix: Permission callbacks tightened on block-discovery and client-stub abilities (security hardening)
+* Fix: Feedback session credentials are scrubbed before storage
+* Fix: Stock image downloads now retry across all configured free image sources
+* Fix: GeminiCacheManager uses exact prefix matching instead of a character mask, preventing unintended cache key collisions
+* Fix: Connectors admin page restored on WordPress 6.9 + Gutenberg installations
+* Fix: Plugin paths now use WP_PLUGIN_DIR and uploads basedir per WordPress.org guidelines
+* Fix: Provider list updates immediately when an API key is saved for the first time
 * Docs: Disclose the optional, opt-in feedback / issue-reporting service hosted at ultimateagentwp.ai in the External Services section (what is sent, when, and links to Terms and Privacy)
 * Docs: Replace the outdated Openverse Terms link (openverse.org/terms now redirects with a 4xx) with the current docs.openverse.org/terms_of_service.html URL
 * Cleanup: Remove `api.example.com` placeholder example text from a php-ai-client SDK docblock and the Custom Tools "URL" input placeholder so static reviewers no longer flag a non-existent external service
@@ -492,7 +522,7 @@ Yes, the plugin works on both single-site and multisite WordPress installations.
 == Upgrade Notice ==
 
 = 1.12.0 =
-Documentation and dependency-maintenance release in response to WordPress.org plugin review feedback. Discloses the optional opt-in feedback service, fixes an outdated Openverse Terms link, removes placeholder example URLs that triggered false-positive "undocumented external service" warnings, moves the WP-CLI benchmark log directory out of the plugin folder, and updates four bundled libraries to current stable releases. No database changes.
+Documentation and dependency-maintenance release addressing WordPress.org review feedback. Discloses the opt-in feedback service, fixes the Openverse Terms link, removes placeholder URLs, moves the WP-CLI benchmark log directory out of the plugin folder, and updates bundled libraries.
 
 = 1.11.1 =
 Documentation-only update: corrects two broken links in the External Services section and adds disclosures for all remaining third-party services (search providers, stock-image services, analytics, notifications) in line with WordPress.org plugin directory guidelines. No code or database changes.

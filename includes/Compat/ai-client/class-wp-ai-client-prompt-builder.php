@@ -246,7 +246,7 @@ class WP_AI_Client_Prompt_Builder {
 						__METHOD__,
 						sprintf(
 							/* translators: %s: string value of the ability name. */
-							__( 'The ability %s was not found.', 'superdav-ai-agent' ),
+							esc_html__( 'The ability %s was not found.', 'superdav-ai-agent' ),
 							'<code>' . esc_html( $ability_name ) . '</code>'
 						),
 						'7.0.0'
@@ -455,9 +455,9 @@ class WP_AI_Client_Prompt_Builder {
 			throw new BadMethodCallException(
 				sprintf(
 					/* translators: 1: Method name. 2: Class name. */
-					__( 'Method %1$s does not exist on %2$s.', 'superdav-ai-agent' ),
-					$name, // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
-					get_class( $this->builder ) // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped
+					esc_html__( 'Method %1$s does not exist on %2$s.', 'superdav-ai-agent' ),
+					esc_html( $name ),
+					esc_html( get_class( $this->builder ) )
 				)
 			);
 		}
