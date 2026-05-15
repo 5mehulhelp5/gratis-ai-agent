@@ -94,6 +94,7 @@
 			".wordpress-org",
 			".stylelintrc.json",
 			".eslintrc.json",
+			".eslintignore",
 			"wp-cli.yml",
 			"*.zip",
 			".playwright-mcp",
