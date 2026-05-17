@@ -217,6 +217,52 @@ class AiClientEventTraceHandlerTest extends WP_UnitTestCase {
 		$this->assertCount( 0, ProviderTrace::list() );
 	}
 
+	public function test_stack_cleared_when_tracing_disabled_between_before_and_after(): void {
+		// Regression: CodeRabbit major fix. If tracing is toggled off between
+		// Before and After events, the stack must still be popped to prevent
+		// stale entries from accumulating. This test verifies that the After
+		// handler pops the stack even when tracing is disabled.
+		$model    = $this->create_model( 'anthropic', 'claude-3-5-sonnet' );
+		$messages = [ $this->create_user_message( 'Test' ) ];
+
+		// Enable tracing and push a Before event.
+		ProviderTrace::set_enabled( true );
+		$this->handler->on_before_generate_result(
+			new BeforeGenerateResultEvent( $messages, $model, null )
+		);
+
+		// Disable tracing before the After event.
+		ProviderTrace::set_enabled( false );
+
+		$result = $this->create_result( 'result-stale', $model, 'Response' );
+		$this->handler->on_after_generate_result(
+			new AfterGenerateResultEvent( $messages, $model, null, $result )
+		);
+
+		// Re-enable tracing and push another Before event. If the stack was
+		// not cleared, this Before would pair with the stale After from the
+		// previous call, causing incorrect trace rows.
+		ProviderTrace::set_enabled( true );
+		$model_2    = $this->create_model( 'openai', 'gpt-4o' );
+		$messages_2 = [ $this->create_user_message( 'Second call' ) ];
+
+		$this->handler->on_before_generate_result(
+			new BeforeGenerateResultEvent( $messages_2, $model_2, null )
+		);
+
+		$result_2 = $this->create_result( 'result-2', $model_2, 'Response 2' );
+		$this->handler->on_after_generate_result(
+			new AfterGenerateResultEvent( $messages_2, $model_2, null, $result_2 )
+		);
+
+		// Verify only one trace row was written (the second call), not two.
+		// If the stack was not cleared, we would have two rows.
+		$rows = ProviderTrace::list();
+		$this->assertCount( 1, $rows, 'Only the second call should be traced; the first was disabled.' );
+		$this->assertSame( 'openai', $rows[0]->provider_id );
+		$this->assertSame( 'gpt-4o', $rows[0]->model_id );
+	}
+
 	public function test_stalled_before_event_writes_synthetic_row(): void {
 		$model    = $this->create_model( 'anthropic', 'claude-3-5-sonnet' );
 		$messages = [ $this->create_user_message( 'Stalled' ) ];
@@ -237,6 +283,47 @@ class AiClientEventTraceHandlerTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $row->status_code );
 		$this->assertSame( 'no_result_event', $row->error );
 		$this->assertGreaterThanOrEqual( 0, $row->duration_ms );
+	}
+
+	public function test_cleanup_clears_stack_even_when_tracing_disabled(): void {
+		// Regression: CodeRabbit major fix. The cleanup_stalled_events()
+		// watchdog must clear the stack even when tracing is disabled,
+		// to prevent stale entries from accumulating across requests.
+		$model    = $this->create_model( 'anthropic', 'claude-3-5-sonnet' );
+		$messages = [ $this->create_user_message( 'Stalled' ) ];
+
+		// Enable tracing and push a Before event.
+		ProviderTrace::set_enabled( true );
+		$this->handler->on_before_generate_result(
+			new BeforeGenerateResultEvent( $messages, $model, null )
+		);
+
+		// Disable tracing and call cleanup. The stack must still be cleared.
+		ProviderTrace::set_enabled( false );
+		AiClientEventTraceLogger::cleanup_stalled_events();
+
+		// Re-enable tracing and push another Before event. If the stack was
+		// not cleared, this Before would be the second entry, and a subsequent
+		// After would pop the wrong entry.
+		ProviderTrace::set_enabled( true );
+		$model_2    = $this->create_model( 'openai', 'gpt-4o' );
+		$messages_2 = [ $this->create_user_message( 'Second call' ) ];
+
+		$this->handler->on_before_generate_result(
+			new BeforeGenerateResultEvent( $messages_2, $model_2, null )
+		);
+
+		$result_2 = $this->create_result( 'result-2', $model_2, 'Response 2' );
+		$this->handler->on_after_generate_result(
+			new AfterGenerateResultEvent( $messages_2, $model_2, null, $result_2 )
+		);
+
+		// Verify the trace row pairs with model_2, not model_1 (which would
+		// indicate the stack was not cleared).
+		$rows = ProviderTrace::list();
+		$this->assertCount( 1, $rows, 'Only the second call should be traced.' );
+		$this->assertSame( 'openai', $rows[0]->provider_id );
+		$this->assertSame( 'gpt-4o', $rows[0]->model_id );
 	}
 
 	public function test_stalled_watchdog_serialises_messages_with_thought_parts(): void {
@@ -327,6 +414,66 @@ class AiClientEventTraceHandlerTest extends WP_UnitTestCase {
 		$full = ProviderTrace::get( $rows[0]->id );
 		$this->assertNotNull( $full );
 		$this->assertSame( 'sdk', $full->source, 'SDK traces should have source=sdk.' );
+	}
+
+	public function test_nested_lifo_correlation_before_a_before_b_after_b_after_a(): void {
+		// Regression: nested provider calls must pair Before/After correctly
+		// using LIFO stack semantics. This test verifies that when two Before
+		// events are pushed (A, then B), the After events pop in reverse order
+		// (B, then A), and each After pairs with its corresponding Before.
+		$model_a = $this->create_model( 'anthropic', 'claude-3-5-sonnet' );
+		$model_b = $this->create_model( 'openai', 'gpt-4o' );
+
+		$messages_a = [ $this->create_user_message( 'First call' ) ];
+		$messages_b = [ $this->create_user_message( 'Nested call' ) ];
+
+		// Push Before(A) onto the stack.
+		$this->handler->on_before_generate_result(
+			new BeforeGenerateResultEvent( $messages_a, $model_a, null )
+		);
+
+		// Push Before(B) onto the stack (now stack is [A, B]).
+		$this->handler->on_before_generate_result(
+			new BeforeGenerateResultEvent( $messages_b, $model_b, null )
+		);
+
+		// Pop and pair After(B) with Before(B).
+		$result_b = $this->create_result( 'result-b', $model_b, 'Nested response' );
+		$this->handler->on_after_generate_result(
+			new AfterGenerateResultEvent( $messages_b, $model_b, null, $result_b )
+		);
+
+		// Pop and pair After(A) with Before(A).
+		$result_a = $this->create_result( 'result-a', $model_a, 'First response' );
+		$this->handler->on_after_generate_result(
+			new AfterGenerateResultEvent( $messages_a, $model_a, null, $result_a )
+		);
+
+		// Verify two trace rows were written, one for each call.
+		$rows = ProviderTrace::list( [ 'limit' => 2 ] );
+		$this->assertCount( 2, $rows, 'Two nested calls should produce two trace rows.' );
+
+		// ProviderTrace::list() returns rows in reverse insertion order (ORDER BY id DESC),
+		// so the most recent row (A) comes first, then B.
+		$row_a_summary = $rows[0];
+		$row_b_summary = $rows[1];
+
+		// Verify row A paired with model A.
+		$this->assertSame( 'anthropic', $row_a_summary->provider_id );
+		$this->assertSame( 'claude-3-5-sonnet', $row_a_summary->model_id );
+
+		// Verify row B paired with model B.
+		$this->assertSame( 'openai', $row_b_summary->provider_id );
+		$this->assertSame( 'gpt-4o', $row_b_summary->model_id );
+
+		// Get full rows to verify response bodies (list() returns only sizes).
+		$row_a_full = ProviderTrace::get( $row_a_summary->id );
+		$row_b_full = ProviderTrace::get( $row_b_summary->id );
+		$this->assertNotNull( $row_a_full );
+		$this->assertNotNull( $row_b_full );
+
+		$this->assertSame( 'result-a', json_decode( $row_a_full->response_body, true )['id'] );
+		$this->assertSame( 'result-b', json_decode( $row_b_full->response_body, true )['id'] );
 	}
 
 	/**
